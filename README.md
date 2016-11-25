@@ -1,13 +1,14 @@
-# go-services-degrade
+# go-cond-strategy
 
-Golang服务降级框架，根据相关指标，自动对相关的服务进行开启关闭，或者降级，例如原来按100%写日志，降级为50%的概率写日志。
+Golang条件策略框架及服务降级框架，根据相关指标，自动对相关的服务进行开启关闭，或者降级，例如原来按100%写日志，降级为50%的概率写日志。
 
 服务降级之后，当条件不再满足的时候，应该能自动恢复。
 
 ## Install 
 
 ```sh
-go get -u github.com/ibbd-dev/go-services-degrade
+# 条件策略框架
+go get -u github.com/ibbd-dev/go-cond-strategy
 ```
 
 ## 主要概念
