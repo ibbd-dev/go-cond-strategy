@@ -8,9 +8,6 @@ import (
 )
 
 const (
-	// 每分钟执行一次
-	duration = time.Minute
-
 	second     int64 = 1000 * 1000 * 1000 // 单位：纳秒
 	minute     int64 = 60 * second
 	fiveMinute int64 = 5 * minute
@@ -24,10 +21,10 @@ type TEventsMetric struct {
 // 单个事件的指标
 type TEventMetric struct {
 	// 1分钟指标
-	OneMinute *TMetric
+	OneMinute TMetric
 
 	// 5分钟指标
-	FiveMinute *TMetric
+	FiveMinute TMetric
 }
 
 // 统计指标
@@ -37,27 +34,37 @@ type TMetric struct {
 }
 
 var (
+	// 每分钟执行一次
+	// 方便测试
+	updateMetricDuration = time.Minute
+	updateMetricFunc     = updateMetric
+
 	metricMu     sync.Mutex
 	eventsMetric *TEventsMetric
 )
 
 func init() {
-	timer.AddFunc(updateMetric, duration)
+	eventsMetric = &TEventsMetric{
+		Events: make(map[string]*TEventMetric),
+	}
+	timer.AddFunc(updateMetricFunc, updateMetricDuration)
 }
 
+// 更新指标
 func updateMetric() {
+	println("====================")
 	metricMu.Lock()
 	eventsRW.Lock()
 
 	now := nowFunc().UnixNano()
 	for name, ev := range events {
-		eventsMetric.Events[name].OneMinute = calMetric(now, ev.oneMinute)
+		eventsMetric.Events[name].OneMinute = calMetric(now, &ev.oneMinute)
 		ev.oneMinute.count = 0
 		ev.oneMinute.totalTime = 0
 		ev.oneMinute.beginTime = now
 
 		if now-ev.fiveMinute.beginTime > fiveMinute {
-			eventsMetric.Events[name].FiveMinute = calMetric(now, ev.fiveMinute)
+			eventsMetric.Events[name].FiveMinute = calMetric(now, &ev.fiveMinute)
 			ev.fiveMinute.count = 0
 			ev.fiveMinute.totalTime = 0
 			ev.fiveMinute.beginTime = now
@@ -67,7 +74,7 @@ func updateMetric() {
 
 	// 判断降级配置
 	confList.Lock()
-	for _, conf := range confList.Conf {
+	for _, conf := range confList.conf {
 		if conf.Check(eventsMetric) {
 			conf.YesAction()
 		} else {
@@ -79,12 +86,17 @@ func updateMetric() {
 	metricMu.Unlock()
 }
 
-func calMetric(now int64, data *tStatData) *TMetric {
-	diff := now - data.beginTime
-	diffRate := float64(now) / float64(diff)
+// 计算事件的指标
+func calMetric(now int64, data *tStatData) (metric TMetric) {
+	if data.count > 0 {
+		diff := now - data.beginTime
+		diffRate := float64(updateMetricDuration) / float64(diff)
 
-	return &TMetric{
-		Count:   uint32(float64(data.count) * diffRate),
-		AvgTime: data.totalTime / int64(data.count),
+		// 总数需要对消耗的时间做一次平滑
+		// 例如统计周期本来设置为1分钟，但是实际上跑了2分钟，2分钟内count=100，那么对于到1分钟应该是count=50
+		metric.Count = uint32(float64(data.count) * diffRate)
+		metric.AvgTime = data.totalTime / int64(data.count)
 	}
+
+	return metric
 }

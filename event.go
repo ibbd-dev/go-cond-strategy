@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-const ()
-
 // 事件
 type TEvent struct {
 	name      string // 事件名
@@ -15,10 +13,10 @@ type TEvent struct {
 
 type tEventStat struct {
 	// 1分钟数值统计
-	oneMinute *tStatData
+	oneMinute tStatData
 
 	// 5分钟数值统计
-	fiveMinute *tStatData
+	fiveMinute tStatData
 }
 
 type tStatData struct {
@@ -40,12 +38,20 @@ func InitEvent(name string) {
 	if events == nil {
 		events = make(map[string]*tEventStat)
 	}
+
+	// 事件初始化
 	events[name] = &tEventStat{}
+	events[name].oneMinute.beginTime = nowFunc().UnixNano()
+	events[name].fiveMinute.beginTime = events[name].oneMinute.beginTime
+
+	// 指标初始化
+	eventsMetric.Events[name] = &TEventMetric{}
+
 	eventsRW.Unlock()
 }
 
-//
-func NewEvent(name string) *TEvent {
+// 开始一个事件
+func BeginEvent(name string) *TEvent {
 	return &TEvent{name: name, beginTime: nowFunc().UnixNano()}
 }
 

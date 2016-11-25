@@ -22,11 +22,80 @@ go get -u github.com/ibbd-dev/go-services-degrade
 
 - 1分钟
 - 5分钟
-- 15分钟
 
 前端可以设置相关指标满足什么条件时，触发什么操作。后台就会周期性计算是否满足触发条件，减少判断的耗时。
 
+## Example
 
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func init() {
+	// 模拟测试
+	updateMetricFunc = func() {}
+	updateMetricDuration = time.Second
+	time.Sleep(time.Second * 2)
+}
+
+func main() {
+	// 初始化事件
+	eventName := "access"
+	InitEvent(eventName)
+
+	// 配置降级策略
+	stragy := &TConf{}
+	var hello int
+	stragy.Check = func(metric *TEventsMetric) bool {
+		if metric.Events[eventName].OneMinute.Count > 100 {
+			// 一分钟内次数超过100，则触发该条件 
+			return true
+		}
+		return false
+	}
+	stragy.YesAction = func() {
+		// 被触发之后需要执行的代码
+		hello = 1
+	}
+	stragy.NoAction = func() {
+		// 不被触发时需要执行的代码
+		hello = 2
+	}
+
+	// 增加策略
+	AddConf(stragy)
+
+	// 模拟数据统计数据
+	for i := 0; i < 200; i++ {
+		ev := BeginEvent(eventName)
+		ev.End()
+	}
+
+	fmt.Printf("%+v\n", events[eventName].oneMinute)
+	if events[eventName].oneMinute.count != 200 {
+		fmt.Printf("%+v\n", events[eventName].oneMinute)
+	}
+
+	// 模拟更新指标
+	time.Sleep(time.Second)
+	updateMetric()
+	println("updateMetric first:")
+	fmt.Printf("%+v\n", eventsMetric.Events[eventName].OneMinute)
+	fmt.Printf("%+v\n", eventsMetric.Events[eventName].FiveMinute)
+	fmt.Printf("%+v\n\n", events[eventName].oneMinute)
+	if events[eventName].oneMinute.count != 0 {
+		fmt.Println("error events count")
+	}
+
+	if hello != 1 {
+		fmt.Println("error value of hello")
+	}
+}
+```
 
 
 
