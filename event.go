@@ -2,6 +2,7 @@ package servicesDegrade
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -28,17 +29,33 @@ type tStatData struct {
 var (
 	eventsRW sync.RWMutex
 	events   map[string]*tEventStat
+	nowFunc  = time.Now
 )
 
-var nowFunc = time.Now
+func init() {
+	events = make(map[string]*tEventStat)
+}
 
-// 事件必须先初始化
-func InitEvent(name string) {
+//************* 事件初始化 **********************
+
+// 同时初始化多个名称的事件
+func InitEvents(names []string) {
 	eventsRW.Lock()
-	if events == nil {
-		events = make(map[string]*tEventStat)
+	for _, name := range names {
+		addOneEvent(name)
 	}
 
+	eventsRW.Unlock()
+}
+
+// 增加一个事件
+func AddEvent(name string) {
+	eventsRW.Lock()
+	addOneEvent(name)
+	eventsRW.Unlock()
+}
+
+func addOneEvent(name string) {
 	// 事件初始化
 	events[name] = &tEventStat{}
 	events[name].oneMinute.beginTime = nowFunc().UnixNano()
@@ -46,11 +63,12 @@ func InitEvent(name string) {
 
 	// 指标初始化
 	eventsMetric.Events[name] = &TEventMetric{}
-
-	eventsRW.Unlock()
 }
 
+//************* 第一类事件：需要统计次数和耗时的事件 ********************
+
 // 开始一个事件
+// 涉及到一个时间段的事件，先调用该接口
 func BeginEvent(name string) *TEvent {
 	return &TEvent{name: name, beginTime: nowFunc().UnixNano()}
 }
@@ -66,8 +84,16 @@ func (e *TEvent) SetName(name string) {
 func (e *TEvent) End() {
 	diff := nowFunc().UnixNano() - e.beginTime
 
-	eventsRW.Lock()
-	events[e.name].oneMinute.count++
-	events[e.name].oneMinute.totalTime += diff
-	eventsRW.Unlock()
+	atomic.AddUint32(&events[e.name].oneMinute.count, 1)
+	atomic.AddUint32(&events[e.name].fiveMinute.count, 1)
+	atomic.AddInt64(&events[e.name].oneMinute.totalTime, diff)
+	atomic.AddInt64(&events[e.name].fiveMinute.totalTime, diff)
+}
+
+//************* 第二类事件：只需要统计次数的事件 ********************
+
+// 只需要统计次数的事件
+func CountEvent(name string) {
+	atomic.AddUint32(&events[name].oneMinute.count, 1)
+	atomic.AddUint32(&events[name].fiveMinute.count, 1)
 }

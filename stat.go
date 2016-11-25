@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	second     int64 = 1000 * 1000 * 1000 // 单位：纳秒
-	minute     int64 = 60 * second
-	fiveMinute int64 = 5 * minute
+	second     = int64(time.Second) // 单位：纳秒
+	minute     = int64(time.Minute)
+	fiveMinute = 5 * minute
 )
 
 // 所有事件的指标
@@ -52,7 +52,7 @@ func init() {
 
 // 更新指标
 func updateMetric() {
-	println("====================")
+	//println("====================")
 	metricMu.Lock()
 	eventsRW.Lock()
 

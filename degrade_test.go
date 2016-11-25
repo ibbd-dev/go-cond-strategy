@@ -15,7 +15,7 @@ func init() {
 func TestDegrade(t *testing.T) {
 	// 初始化事件
 	eventName := "access"
-	InitEvent(eventName)
+	AddEvent(eventName)
 
 	// 配置降级策略
 	stragy := &TConf{}
