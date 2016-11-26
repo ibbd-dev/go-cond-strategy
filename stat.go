@@ -1,4 +1,4 @@
-package servicesDegrade
+package crondStrategy
 
 import (
 	"sync"
@@ -52,11 +52,11 @@ func init() {
 
 // 更新指标
 func updateMetric() {
+	now := nowFunc().UnixNano()
 	//println("====================")
+
 	metricMu.Lock()
 	eventsRW.Lock()
-
-	now := nowFunc().UnixNano()
 	for name, ev := range events {
 		// 將1分钟的统计数据加到5分钟的统计数据上
 		ev.fiveMinute.count += ev.oneMinute.count
@@ -78,7 +78,7 @@ func updateMetric() {
 	}
 	eventsRW.Unlock()
 
-	// 判断降级配置
+	// 普通的策略配置
 	confList.Lock()
 	for _, conf := range confList.conf {
 		if conf.Check(eventsMetric) {
@@ -89,20 +89,45 @@ func updateMetric() {
 	}
 	confList.Unlock()
 
+	// 降级服务配置
+	degConfList.Lock()
+	for _, conf := range degConfList.conf {
+		level := conf.Check(eventsMetric)
+		if level != conf.lastLevel {
+			conf.lastLevel = parseLevel(conf.lastLevel, level, conf)
+		}
+	}
+	degConfList.Unlock()
+
 	metricMu.Unlock()
 }
 
 // 计算事件的指标
 func calMetric(now int64, data *tStatData) (metric TMetric) {
 	if data.count > 0 {
-		diff := now - data.beginTime
-		diffRate := float64(updateMetricDuration) / float64(diff)
+		diffRate := float64(updateMetricDuration) / float64(now-data.beginTime)
 
 		// 总数需要对消耗的时间做一次平滑
 		// 例如统计周期本来设置为1分钟，但是实际上跑了2分钟，2分钟内count=100，那么对于到1分钟应该是count=50
 		metric.Count = uint32(float64(data.count) * diffRate)
-		metric.AvgTime = data.totalTime / int64(data.count)
+
+		if data.totalTime > 0 {
+			// 有些并不需要统计平均耗时
+			metric.AvgTime = data.totalTime / int64(data.count)
+		}
 	}
 
 	return metric
+}
+
+// TODO 跨级别改变：向上允许跳级，但是向下不允许跳级
+// 跳级的时候，例如从L1跳级到L3，则L2,L3的action都需要执行
+// 如果级别发生了变化，则需要执行相应的action
+func parseLevel(oldLevel, newLevel DegradeLevel, conf *TDegradeConf) DegradeLevel {
+	if action := conf.actions[newLevel]; action != nil {
+		// 执行相应的动作
+		conf.actions[newLevel]()
+	}
+
+	return newLevel
 }
