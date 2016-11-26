@@ -78,26 +78,18 @@ func updateMetric() {
 	}
 	eventsRW.Unlock()
 
-	// 普通的策略配置
-	confList.Lock()
-	for _, conf := range confList.conf {
-		if conf.Check(eventsMetric) {
-			conf.YesAction()
-		} else {
-			conf.NoAction()
+	// 策略配置
+	var level TLevel
+	strategyList.Lock()
+	for _, strategy := range strategyList.strategy {
+		if strategy.isClose == false {
+			level = strategy.Check(eventsMetric)
+			if level != strategy.lastLevel {
+				strategy.lastLevel = parseLevel(strategy, level)
+			}
 		}
 	}
-	confList.Unlock()
-
-	// 降级服务配置
-	degConfList.Lock()
-	for _, conf := range degConfList.conf {
-		level := conf.Check(eventsMetric)
-		if level != conf.lastLevel {
-			conf.lastLevel = parseLevel(conf.lastLevel, level, conf)
-		}
-	}
-	degConfList.Unlock()
+	strategyList.Unlock()
 
 	metricMu.Unlock()
 }
@@ -120,14 +112,12 @@ func calMetric(now int64, data *tStatData) (metric TMetric) {
 	return metric
 }
 
-// TODO 跨级别改变：向上允许跳级，但是向下不允许跳级
-// 跳级的时候，例如从L1跳级到L3，则L2,L3的action都需要执行
 // 如果级别发生了变化，则需要执行相应的action
-func parseLevel(oldLevel, newLevel DegradeLevel, conf *TDegradeConf) DegradeLevel {
-	if action := conf.actions[newLevel]; action != nil {
-		// 执行相应的动作
-		conf.actions[newLevel]()
+// 跨级别改变：向上允许跳级，但是向下不允许跳级
+func parseLevel(strategy *TStrategy, newLevel TLevel) TLevel {
+	if strategy.lastLevel > newLevel+1 {
+		newLevel = strategy.lastLevel - 1
 	}
-
+	strategy.Action(newLevel)
 	return newLevel
 }
