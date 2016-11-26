@@ -108,5 +108,16 @@ func TestDegrade(t *testing.T) {
 		fmt.Printf("%+v\n", eventsMetric.Events[eventName].FiveMinute)
 		t.Fatalf("error world")
 	}
+}
 
+func BenchmarkEvent(b *testing.B) {
+	eventName := "access"
+	AddEvent(eventName)
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			ev := BeginEvent(eventName)
+			ev.End()
+		}
+	})
 }

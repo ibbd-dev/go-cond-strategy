@@ -107,5 +107,18 @@ func main() {
 }
 ```
 
+## 性能数据
+
+BeginEvent和End的性能数据
+
+```
+// 同时记录1分钟数据和5分钟数据
+BenchmarkEvent-4    20000000            73.6 ns/op
+
+// 只记录1分钟数据，5分钟数据在后续统计时补上
+BenchmarkEvent-4    20000000            61.7 ns/op
+
+```
+
 
 

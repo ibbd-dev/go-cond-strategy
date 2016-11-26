@@ -58,12 +58,18 @@ func updateMetric() {
 
 	now := nowFunc().UnixNano()
 	for name, ev := range events {
+		// 將1分钟的统计数据加到5分钟的统计数据上
+		ev.fiveMinute.count += ev.oneMinute.count
+		ev.fiveMinute.totalTime += ev.oneMinute.totalTime
+
+		// 计算1分钟的指标
 		eventsMetric.Events[name].OneMinute = calMetric(now, &ev.oneMinute)
 		ev.oneMinute.count = 0
 		ev.oneMinute.totalTime = 0
 		ev.oneMinute.beginTime = now
 
 		if now-ev.fiveMinute.beginTime > fiveMinute {
+			// 计算5分钟的指标
 			eventsMetric.Events[name].FiveMinute = calMetric(now, &ev.fiveMinute)
 			ev.fiveMinute.count = 0
 			ev.fiveMinute.totalTime = 0

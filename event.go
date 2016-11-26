@@ -81,19 +81,18 @@ func (e *TEvent) SetName(name string) {
 }
 
 // 事件结束接口
+// 建议以协程的方式调用
 func (e *TEvent) End() {
 	diff := nowFunc().UnixNano() - e.beginTime
 
 	atomic.AddUint32(&events[e.name].oneMinute.count, 1)
-	atomic.AddUint32(&events[e.name].fiveMinute.count, 1)
 	atomic.AddInt64(&events[e.name].oneMinute.totalTime, diff)
-	atomic.AddInt64(&events[e.name].fiveMinute.totalTime, diff)
 }
 
 //************* 第二类事件：只需要统计次数的事件 ********************
 
 // 只需要统计次数的事件
+// 建议以协程的方式调用
 func CountEvent(name string) {
 	atomic.AddUint32(&events[name].oneMinute.count, 1)
-	atomic.AddUint32(&events[name].fiveMinute.count, 1)
 }
