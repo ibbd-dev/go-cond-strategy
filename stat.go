@@ -29,8 +29,8 @@ type TEventMetric struct {
 
 // 统计指标
 type TMetric struct {
-	Count   uint32 // 时间段内事件发生的次数
-	AvgTime int64  // 时间段内事件消耗的平均时间(总耗时 / 总次数)
+	Count   uint32  // 时间段内事件发生的次数
+	AvgTime float64 // 时间段内事件消耗的平均时间(总耗时 / 总次数)
 }
 
 var (
@@ -101,11 +101,16 @@ func calMetric(now int64, data *tStatData) (metric TMetric) {
 
 		// 总数需要对消耗的时间做一次平滑
 		// 例如统计周期本来设置为1分钟，但是实际上跑了2分钟，2分钟内count=100，那么对于到1分钟应该是count=50
-		metric.Count = uint32(float64(data.count) * diffRate)
+		countF64 := float64(data.count) * diffRate
+		metric.Count = uint32(countF64)
+		if metric.Count < 10 && countF64-float64(metric.Count) > 0.5 {
+			// 值太小的时候，四舍五入比较合理
+			metric.Count += 1
+		}
 
 		if data.totalTime > 0 {
 			// 有些并不需要统计平均耗时
-			metric.AvgTime = data.totalTime / int64(data.count)
+			metric.AvgTime = float64(data.totalTime) / countF64
 		}
 	}
 
